@@ -15,6 +15,24 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// MySQLTable ...
+type MySQLTable struct {
+	Schema  string `gorm:"column:TABLE_SCHEMA"`
+	Name    string `gorm:"column:TABLE_NAME"`
+	Comment string `gorm:"column:TABLE_COMMENT"`
+}
+
+var _ model.Table = (*MySQLTable)(nil)
+
+// GetScheme gets the table scheme
+func (m MySQLTable) GetScheme() string { return m.Schema }
+
+// GetName ...
+func (m MySQLTable) GetName() string { return m.Name }
+
+// GetComment  ...
+func (m MySQLTable) GetComment() string { return m.Comment }
+
 // MyTableColumn ...
 type MyTableColumn struct {
 	Name      string         `gorm:"column:COLUMN_NAME"`
@@ -58,17 +76,34 @@ func (c MyTableColumn) GetDefault() string {
 
 // MySQLSchema ...
 type MySQLSchema struct {
-	dbFn         func() (*gorm.DB, error)
-	compatibleDs string
-
-	verbose       bool
-	showAllTables bool
-	showTables    []string
+	dbFn    func() (*gorm.DB, error)
+	verbose bool
 }
 
 // Tables get all the tables
 func (s *MySQLSchema) Tables() ([]model.Table, error) {
-	panic("implement me")
+	db, err := s.dbFn()
+	if err != nil {
+		return nil, err
+	}
+
+	defer gouio.Close(db)
+
+	var tables []MySQLTable
+
+	const sq = `SELECT * FROM information_schema.TABLES
+		WHERE TABLE_SCHEMA NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')`
+
+	db.Raw(sq).Find(&tables)
+
+	ts := make([]model.Table, len(tables))
+
+	for i, t := range tables {
+		//t.Comment = strings.TrimSpace(t.Comment)
+		ts[i] = t
+	}
+
+	return ts, db.Error
 }
 
 // TableColumns gets the all columns by table name
@@ -84,13 +119,13 @@ func (s *MySQLSchema) TableColumns(table string) ([]model.TableColumn, error) {
 	schema, tableName := ParseTable(table)
 
 	if schema != "" {
-		const s = `SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? ` +
-			`AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`
+		const s = `SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ?
+			AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`
 
 		db.Raw(s, schema, tableName).Find(&columns)
 	} else {
-		const s = `SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = database() ` +
-			`AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`
+		const s = `SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = database()
+			AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`
 
 		db.Raw(s, tableName).Find(&columns)
 	}
@@ -114,25 +149,10 @@ func ParseTable(table string) (schemaName, tableName string) {
 	return "", table
 }
 
-// CompatibleDs returns the dataSourceName from various the compatible format.
-func (s *MySQLSchema) CompatibleDs() string { return s.compatibleDs }
-
 var _ model.DbSchema = (*MySQLSchema)(nil)
 
 // SetVerbose sets verbose
-func (s *MySQLSchema) SetVerbose(verbose bool) {
-	s.verbose = verbose
-}
-
-// SetShowTables set which tables to show
-func (s *MySQLSchema) SetShowTables(tables []string) {
-	if len(tables) == 0 {
-		s.showAllTables = true
-		return
-	}
-
-	s.showTables = tables
-}
+func (s *MySQLSchema) SetVerbose(verbose bool) { s.verbose = verbose }
 
 // CreateMySQLSchema ...
 func CreateMySQLSchema(dataSourceName string) (*MySQLSchema, error) {
@@ -140,7 +160,6 @@ func CreateMySQLSchema(dataSourceName string) (*MySQLSchema, error) {
 	logrus.Infof("dataSourceName:%s", compatibleDs)
 
 	return &MySQLSchema{
-		dbFn:         func() (*gorm.DB, error) { return sqlmore.NewSQLMore("mysql", compatibleDs).GormOpen() },
-		compatibleDs: compatibleDs,
+		dbFn: func() (*gorm.DB, error) { return sqlmore.NewSQLMore("mysql", compatibleDs).GormOpen() },
 	}, nil
 }

@@ -4,6 +4,8 @@ import "database/sql"
 
 // Table abstract a table information
 type Table interface {
+	// GetScheme gets the table scheme
+	GetScheme() string
 	// GetName gets the table name
 	GetName() string
 	// GetComment gets the table comment
@@ -32,6 +34,4 @@ type DbSchema interface {
 	Tables() ([]Table, error)
 	// TableColumns gets the all columns by table name
 	TableColumns(table string) ([]TableColumn, error)
-	// CompatibleDs returns the dataSourceName from various the compatible format.
-	CompatibleDs() string
 }
