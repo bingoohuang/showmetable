@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"strings"
 
@@ -40,16 +41,18 @@ func (w *markdownWriter) WriteTable(st model.Table) {
 
 // WriteColumns writes columns of table
 func (w *markdownWriter) WriteColumns(columns []model.TableColumn) {
-	w.write("字段名称|数据类型|是否可空|默认值|字段注释\n")
-	w.write("---|  ---    |  ---   |  ---  |  ---\n")
+	w.write("#  |字段名称|数据类型|是否可空|默认值|字段注释\n")
+	w.write("---|---|  ---    |  ---   |  ---  |  ---\n")
 
-	for _, c := range columns {
+	for i, c := range columns {
 		cc := c.GetComment()
 		if cc != "" {
 			cc = newlineRe.ReplaceAllString(cc, "<br>")
 		}
 
-		w.write(c.GetName(), "|", c.GetDataType(), "|", str.If(c.IsNullable(),
+		seq := fmt.Sprintf("%d", i+1) // nolint gomnd
+
+		w.write(seq, "|", c.GetName(), "|", c.GetDataType(), "|", str.If(c.IsNullable(),
 			"Y", "N"), "|", c.GetDefault(), "|", cc, "\n")
 	}
 
