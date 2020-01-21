@@ -1,11 +1,8 @@
 package main
 
 import (
-	"fmt"
-	"io/ioutil"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/bingoohuang/gou/str"
@@ -59,27 +56,18 @@ func (a *App) showTables() {
 		}
 	}
 
-	var md strings.Builder
-
-	w := func(s string) {
-		_, _ = md.WriteString(s)
-	}
+	w := MakeTableWriters(makeMarkdownWriter(), makeExcelWriter())
 
 	for _, st := range showTableModels {
 		a.showTable(st, w)
 	}
 
-	f := time.Now().Format("20060102150405") + ".md"
-	if err := ioutil.WriteFile(f, []byte(md.String()), 0644); err != nil {
-		panic(err)
-	}
-
-	fmt.Println(f, "generated!")
+	_, _ = w.SaveAs(time.Now().Format("20060102150405"))
 }
 
 var newlineRe = regexp.MustCompile(`\r?\n`) // nolint gochecknoglobals
 
-func (a *App) showTable(st model.Table, mdw func(s string)) {
+func (a *App) showTable(st model.Table, w TableWriter) {
 	t := st.GetScheme() + "." + st.GetName()
 	columns, err := a.schema.TableColumns(t)
 
@@ -87,39 +75,8 @@ func (a *App) showTable(st model.Table, mdw func(s string)) {
 		panic(err)
 	}
 
-	//fmt.Printf("table %s, columns: %+v\n", t, columns)
-
-	createMarkdown(mdw, st, columns)
-}
-
-func createMarkdown(mdw func(s string), st model.Table, columns []model.TableColumn) {
-	mdw("## ")
-	mdw(st.GetName())
-	mdw("\n\n")
-
-	comment := st.GetComment()
-	if comment != "" {
-		mdw(comment)
-		mdw("\n\n")
-	}
-
-	mdw("Name|DataType|Nullable|Default|Comment\n")
-	mdw("---|  ---    |  ---   |  ---  |  ---\n")
-
-	for _, c := range columns {
-		cc := c.GetComment()
-		if cc != "" {
-			cc = newlineRe.ReplaceAllString(cc, "<br>")
-		}
-
-		mdw(c.GetName() +
-			"|" + c.GetDataType() +
-			"|" + str.If(c.IsNullable(), "Y", "N") +
-			"|" + c.GetDefault() +
-			"|" + cc + "\n")
-	}
-
-	mdw("\n")
+	w.WriteTable(st)
+	w.WriteColumns(columns)
 }
 
 func findTable(showTables []string, t model.Table) model.Table {

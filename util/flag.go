@@ -14,7 +14,6 @@ import (
 // InitFlags ...
 func InitFlags() {
 	help := pflag.BoolP("help", "h", false, "help")
-	pflag.StringP("fmt", "f", "md", "md/excel")
 	pflag.StringP("ds", "d", "", `eg. 
 	MYSQL_PWD=8BE4 mysql -h 127.0.0.1 -P 9633 -u root
 	mysql -h 127.0.0.1 -P 9633 -u root -p8BE4
@@ -25,7 +24,7 @@ func InitFlags() {
 	127.0.0.1:9633 root/8BE4 db=test
 	root:8BE4@tcp(127.0.0.1:9633)/?charset=utf8mb4&parseTime=true&loc=Local
 `)
-	pflag.StringP("tables", "t", "", "show tables, separated by comma, empty for all")
+	pflag.StringP("tables", "t", "", "show tables, separated by comma, empty for all, like db1.*,db1.mytable")
 	pflag.BoolP("verbose", "V", false, "verbose details")
 
 	pprofAddr := htt.PprofAddrPflag()
