@@ -41,7 +41,7 @@ func (w *markdownWriter) WriteTable(st model.Table) {
 
 // WriteColumns writes columns of table
 func (w *markdownWriter) WriteColumns(columns []model.TableColumn) {
-	w.write("#  |字段名称|数据类型|是否可空|默认值|字段注释\n")
+	w.write("\\#  |字段名称|数据类型|是否可空|默认值|字段注释\n")
 	w.write("---|---|  ---    |  ---   |  ---  |  ---\n")
 
 	for i, c := range columns {
