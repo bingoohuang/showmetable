@@ -3,7 +3,6 @@ package dbi
 import (
 	"database/sql"
 
-	gouio "github.com/bingoohuang/gou/io"
 	"github.com/bingoohuang/gou/str"
 
 	"strings"
@@ -57,7 +56,7 @@ func (c MyTableColumn) IsNullable() bool { return c.Nullable == "YES" }
 func (c MyTableColumn) GetMaxSize() sql.NullInt64 { return c.MaxLength }
 
 // GetDataType ...
-func (c MyTableColumn) GetDataType() string { return c.DataType }
+func (c MyTableColumn) GetDataType() string { return c.Type }
 
 // GetName ...
 func (c MyTableColumn) GetName() string { return c.Name }
@@ -67,34 +66,60 @@ func (c MyTableColumn) GetComment() string { return c.Comment }
 
 // GetDefault ...
 func (c MyTableColumn) GetDefault() string {
+	d := ""
+
 	if c.Default.Valid {
-		return c.Default.String
+		d = c.Default.String
 	}
 
-	return ""
+	if c.DataType == "double" {
+		d = TrimNumber(d)
+	}
+
+	return d
+}
+
+// TrimNumber trim zeros from s.
+func TrimNumber(s string) string {
+	for {
+		if !strings.HasSuffix(s, "0") {
+			break
+		}
+
+		s = s[:len(s)-1]
+	}
+
+	if strings.HasSuffix(s, ".") {
+		s = s[:len(s)-1]
+	}
+
+	return s
 }
 
 // MySQLSchema ...
 type MySQLSchema struct {
 	dbFn    func() (*gorm.DB, error)
 	verbose bool
+	db      *gorm.DB
 }
 
 // Tables get all the tables
 func (s *MySQLSchema) Tables() ([]model.Table, error) {
-	db, err := s.dbFn()
+	var err error
+	s.db, err = s.dbFn()
+
 	if err != nil {
 		return nil, err
 	}
 
-	defer gouio.Close(db)
+	//defer gouio.Close(db)
 
 	var tables []MySQLTable
 
 	const sq = `SELECT * FROM information_schema.TABLES
 		WHERE TABLE_SCHEMA NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')`
 
-	db.Raw(sq).Find(&tables)
+	s.db.Raw(sq).Find(&tables)
 
 	ts := make([]model.Table, len(tables))
 
@@ -103,31 +128,24 @@ func (s *MySQLSchema) Tables() ([]model.Table, error) {
 		ts[i] = t
 	}
 
-	return ts, db.Error
+	return ts, s.db.Error
 }
 
 // TableColumns gets the all columns by table name
 func (s *MySQLSchema) TableColumns(table string) ([]model.TableColumn, error) {
-	db, err := s.dbFn()
-	if err != nil {
-		return nil, err
-	}
-
-	defer gouio.Close(db)
-
 	columns := make([]MyTableColumn, 0)
 	schema, tableName := ParseTable(table)
 
 	if schema != "" {
-		const s = `SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ?
+		const q = `SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ?
 			AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`
 
-		db.Raw(s, schema, tableName).Find(&columns)
+		s.db.Raw(q, schema, tableName).Find(&columns)
 	} else {
-		const s = `SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = database()
+		const q = `SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = database()
 			AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`
 
-		db.Raw(s, tableName).Find(&columns)
+		s.db.Raw(q, tableName).Find(&columns)
 	}
 
 	ts := make([]model.TableColumn, len(columns))
@@ -137,7 +155,7 @@ func (s *MySQLSchema) TableColumns(table string) ([]model.TableColumn, error) {
 		ts[i] = t
 	}
 
-	return ts, db.Error
+	return ts, s.db.Error
 }
 
 // ParseTable parses the schema and table name from table which may be like db1.t1
