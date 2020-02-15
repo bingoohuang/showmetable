@@ -32,3 +32,7 @@ INFO[0000] dataSourceName:aaa:bbb@tcp(1.2.1.1:3306)/?charset=utf8mb4&parseTime=t
 20200121144038.xlsx generated!
 
 ```
+
+## TODO
+
+1. support direct ddl sql file, like [Metaprogram in Go How to use Golang to metaprogram a CRUD API](https://levelup.gitconnected.com/metaprogram-in-go-5a2a7e989613) and [code](https://github.com/exyzzy/metaapi)
